@@ -1,0 +1,5 @@
+project: builder-template
+description: Template for SPAI builder project
+thumbnail: https://play.google.com/store/apps/details?id=com.hellomagazine.hellomagazine&hl=es_US
+apis:
+  - name: runner

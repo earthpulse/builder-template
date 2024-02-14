@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import argparse
 
-app = FastAPI(title="analytics")
+app = FastAPI(title="builder-runner", version="0.1.0", description="API to run code from the SPAI builder and provide outputs.")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -12,6 +12,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# TODO
+# esta api recibirá desde la UI el grafo 
+# esta api envia el grafo a la api de SPAI y recibe código a ejecutar
+# esta api ejecuta el código (guardando los outputs en el storage asoicado a el proyecto del usuario)
+# esta api expone lo necesario para que la UI del builder pueda obtener los outputs de la ejecución (layers, analytics, etc)
 
 @app.get("/")
 async def hello():

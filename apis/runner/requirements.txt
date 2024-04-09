@@ -12,4 +12,5 @@ mercantile
 cachetools
 matplotlib
 shapely 
+dask
 geopandas

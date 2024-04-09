@@ -13,6 +13,8 @@ from spai.data.satellite import explore_satellite_images, download_satellite_ima
 from spai.image.xyz import get_image_data, get_tile_data, ready_image
 from starlette.responses import StreamingResponse
 from spai.image.xyz.errors import ImageOutOfBounds
+from typing import List
+from dask import get
 
 load_dotenv()
 
@@ -211,6 +213,7 @@ def retrieve_images():
         print('ERROR', repr(e))
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+
 # visualize images 
 
 
@@ -238,6 +241,74 @@ def retrieve_image_tile(
         return StreamingResponse(image, media_type="image/png")
     except ImageOutOfBounds as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=error.message)
+    
+# builder 
+
+class GraphBody(BaseModel):
+    graph: List[dict]
+
+@app.post("/graph")
+def save_graph(body: GraphBody):
+    try:
+        # Storage de momento no guarda listas... pero es un json...
+        # storage.create(body.graph, "graph.json")
+        storage.create_from_dict(body.graph, "graph.json")
+        return 
+    except Exception as e:
+        print('ERROR', repr(e))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+
+@app.get("/graph")
+def retrieve_graph():
+    try:
+        graph = storage.read("graph.json") # devuelve pandas dataframe...
+        return graph.to_dict(orient="records")
+    except Exception as e:
+        print('ERROR', repr(e))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+
+@app.post("/graph/run")
+def save_graph(body: GraphBody):
+    try:
+        # save graph
+        storage.create_from_dict(body.graph, "graph.json")
+        # convert to dask graph
+        graph = {}
+        for node in body.graph:
+            data = node['data']
+            fn = nodeId2Function(data['id'])
+            args = [field['value'] for field in data['fields']]
+            graph[node['id']] = (fn, *args)
+        evaluate = [node['id'] for node in body.graph if evaluable(node['data'])]
+        print(graph)
+        print(evaluate)
+        # run graph
+        results = get(graph, evaluate)
+        print(results)
+        return results
+    except Exception as e:
+        print('ERROR', repr(e))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+    
+# TODO: move functions to a separate file
+
+def nodeId2Function(id):
+    if id == "Area of Interest":
+        return read_aoi
+    raise ValueError(f"Node {id} not found")
+
+def evaluable(data):
+    if data['id'] == "Area of Interest":
+        return True
+    return False
+
+def read_aoi(name):
+    if name:
+        return storage.read(f"{name}.geojson").__geo_interface__
+    raise ValueError("AOI name not valid")
     
 # need this to run in background
 if __name__ == "__main__":

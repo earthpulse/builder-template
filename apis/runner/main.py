@@ -15,6 +15,7 @@ from starlette.responses import StreamingResponse
 from spai.image.xyz.errors import ImageOutOfBounds
 from typing import List
 from dask import get
+import time 
 
 load_dotenv()
 
@@ -39,7 +40,7 @@ async def hello():
     print("Builder")
     return storage.list()
 
-# save aois in storage
+# manage aois in storage
 
 class VectorModel(BaseModel):
     type: str  # must be 'Feature'
@@ -245,14 +246,15 @@ def retrieve_image_tile(
 # builder 
 
 class GraphBody(BaseModel):
-    graph: List[dict]
+    nodes: List[dict]
+    edges: List[dict]
 
 @app.post("/graph")
 def save_graph(body: GraphBody):
     try:
         # Storage de momento no guarda listas... pero es un json...
-        # storage.create(body.graph, "graph.json")
-        storage.create_from_dict(body.graph, "graph.json")
+        storage.create_from_dict(body.nodes, "nodes.json")
+        storage.create_from_dict(body.edges, "edges.json")
         return 
     except Exception as e:
         print('ERROR', repr(e))
@@ -262,8 +264,16 @@ def save_graph(body: GraphBody):
 @app.get("/graph")
 def retrieve_graph():
     try:
-        graph = storage.read("graph.json") # devuelve pandas dataframe...
-        return graph.to_dict(orient="records")
+        nodes = storage.read("nodes.json").fillna(0).to_dict(orient="records")
+        edges = storage.read("edges.json").fillna(0).to_dict(orient="records")
+        # al leer el json con pandas, los campos vacios se rellenan con nan (los cambio a 0)
+        # esto puede afectar si alguna propiedad no espera un valor como 0...
+        # el storage debería  exponer una manera de leer un json directamente, sin pasar por pandas !!!
+        print(nodes)
+        return {
+            "nodes": nodes,
+            "edges": edges
+        }
     except Exception as e:
         print('ERROR', repr(e))
         raise HTTPException(
@@ -273,20 +283,30 @@ def retrieve_graph():
 def save_graph(body: GraphBody):
     try:
         # save graph
-        storage.create_from_dict(body.graph, "graph.json")
+        nodes = storage.read("nodes.json").to_dict(orient="records")
+        edges = storage.read("edges.json").to_dict(orient="records")
         # convert to dask graph
         graph = {}
-        for node in body.graph:
+        for node in body.nodes:
             data = node['data']
             fn = nodeId2Function(data['id'])
             args = [field['value'] for field in data['fields']]
+            # find inputs in edges 
+            inputs = data['inputs']
+            _edges = [edge for edge in edges if edge['source'] == node['id']]
+            for input in inputs:
+                input_name = input['name']
+                edge = [edge for edge in _edges if edge['sourceHandle'] == input_name]
+                assert len(edge) == 1, f"Edge {input_name} not found"
+                input = edge[0]['target']
+                args += [input]
             graph[node['id']] = (fn, *args)
-        evaluate = [node['id'] for node in body.graph if evaluable(node['data'])]
-        print(graph)
-        print(evaluate)
+        evaluate = [node['id'] for node in body.nodes if evaluable(node['data'])]
+        # print("\ngraph", graph)
+        # print("\nevaluate", evaluate)
         # run graph
         results = get(graph, evaluate)
-        print(results)
+        # print('\nresults', results)
         return results
     except Exception as e:
         print('ERROR', repr(e))
@@ -298,10 +318,14 @@ def save_graph(body: GraphBody):
 def nodeId2Function(id):
     if id == "Area of Interest":
         return read_aoi
+    if id == "Date Selector":
+        return parse_dates
+    if id == "Forest Monitoring":
+        return forest_monitoring
     raise ValueError(f"Node {id} not found")
 
-def evaluable(data):
-    if data['id'] == "Area of Interest":
+def evaluable(data): # should return serializable data
+    if data['id'] == "Forest Monitoring":
         return True
     return False
 
@@ -309,6 +333,15 @@ def read_aoi(name):
     if name:
         return storage.read(f"{name}.geojson").__geo_interface__
     raise ValueError("AOI name not valid")
+
+def parse_dates(dates):
+    print("dates", dates)
+    return dates
+
+def forest_monitoring(aoi, dates):
+    print("aoi", aoi)
+    print("dates", dates)
+    return "forest monitoring"
     
 # need this to run in background
 if __name__ == "__main__":

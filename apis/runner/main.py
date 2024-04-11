@@ -15,7 +15,11 @@ from spai.image.xyz.errors import ImageOutOfBounds
 from typing import List
 from dask import get
 
-app = FastAPI(title="builder-runner", version="0.1.0", description="API to run code from the SPAI builder and provide outputs.")
+app = FastAPI(
+    title="builder-runner",
+    version="0.1.0",
+    description="API to run code from the SPAI builder and provide outputs.",
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,40 +34,53 @@ vars = SPAIVars()
 os.environ["SH_CLIENT_ID"] = os.getenv("SH_CLIENT_ID", vars["SH_CLIENT_ID"])
 os.environ["SH_CLIENT_SECRET"] = os.getenv("SH_CLIENT_SECRET", vars["SH_CLIENT_SECRET"])
 
+
 @app.get("/")
 async def hello():
     print("Builder")
     return storage.list()
 
+
 # manage aois in storage
+
 
 class VectorModel(BaseModel):
     type: str  # must be 'Feature'
     properties: Dict  # shall be JSON Object or null
     geometry: Dict  # shall be Geometry Object or null: 'type' member must be a Geometry Type and 'coordinates' member shall be an array
 
-    @field_validator('type')
+    @field_validator("type")
     def check_feature_type_is_valid(cls, type):
-        assert type == 'Feature', 'Invalid GeoJSON: In Feature Object, "type" member is not valid'
+        assert (
+            type == "Feature"
+        ), 'Invalid GeoJSON: In Feature Object, "type" member is not valid'
         return type
 
-    @field_validator('properties')
+    @field_validator("properties")
     # throws a JSONDecodeError
     def check_feature_properties_is_valid(cls, properties):
         p = json.dumps(properties)
         assert p, 'Invalid GeoJSON: In Feature Object, "properties" member is not valid'
         return properties
 
-    @field_validator('geometry')
+    @field_validator("geometry")
     # throws a JSONDecodeError
     # returns error message: value is not a valid dict if geometry is not a JSON file
     def check_feature_geometry_is_valid(cls, geometry):
         geo = json.dumps(geometry)
         geo_members = json.loads(geo)
-        assert geo_members['type'] in ('Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon',
-                                       'GeometryCollection'), 'Invalid GeoJSON: In Feature Object, "geometry - type" member is not valid'
-        assert isinstance(
-            geo_members['coordinates'], list) == True, 'Invalid GeoJSON: In Feature Object, "geometry - coordinates" member is not valid'
+        assert geo_members["type"] in (
+            "Point",
+            "MultiPoint",
+            "LineString",
+            "MultiLineString",
+            "Polygon",
+            "MultiPolygon",
+            "GeometryCollection",
+        ), 'Invalid GeoJSON: In Feature Object, "geometry - type" member is not valid'
+        assert (
+            isinstance(geo_members["coordinates"], list) == True
+        ), 'Invalid GeoJSON: In Feature Object, "geometry - coordinates" member is not valid'
         return geometry
 
 
@@ -71,71 +88,94 @@ class GeoJSONModel(BaseModel):
     type: str  # must be a GeoJSON Type
     features: List[VectorModel]  # shall be a JSON array or an empty array
 
-    @field_validator('type')
+    @field_validator("type")
     def check_geojson_type_is_valid(cls, type):
-        assert type in ('FeatureCollection', 'Feature', 'Point', 'LineString', 'MultiPoint', 'Polygon',
-                        'MultiLineString', 'MultiPolygon', 'GeometryCollection'), 'Invalid GeoJSON "type" member'
+        assert type in (
+            "FeatureCollection",
+            "Feature",
+            "Point",
+            "LineString",
+            "MultiPoint",
+            "Polygon",
+            "MultiLineString",
+            "MultiPolygon",
+            "GeometryCollection",
+        ), 'Invalid GeoJSON "type" member'
         return type
+
 
 class InvalidGeoJSONError(Exception):
     def __init__(self, message):
         self.message = message
         super().__init__(message)
 
+
 class AOIGeoJSONFeatureModel(VectorModel):
-    @field_validator('geometry')
+    @field_validator("geometry")
     def check_feature_geometry_is_valid(cls, geometry):
         geo = json.dumps(geometry)
         geo_members = json.loads(geo)
-        if geo_members['type'] not in ('Polygon', 'MultiPolygon'):
+        if geo_members["type"] not in ("Polygon", "MultiPolygon"):
             raise InvalidGeoJSONError(
-                f'Invalid GeoJSON: In Feature Object, "geometry - type" member is not valid: Must be a "Polygon" or a "MultiPolygon"')
-        if not isinstance(geo_members['coordinates'], list):
+                f'Invalid GeoJSON: In Feature Object, "geometry - type" member is not valid: Must be a "Polygon" or a "MultiPolygon"'
+            )
+        if not isinstance(geo_members["coordinates"], list):
             raise InvalidGeoJSONError(
-                f'Invalid GeoJSON: In Feature Object, "geometry - coordinates" member is not valid')
+                f'Invalid GeoJSON: In Feature Object, "geometry - coordinates" member is not valid'
+            )
         # check all coordinates are valid (lat, lng)
-        if geo_members['type'] == "Polygon":
-            for coords in geo_members['coordinates'][0]:
-                assert len(
-                    coords) == 2, f'Invalid GeoJSON: In Feature Object, "geometry - coordinates" member is not valid'
-                assert coords[0] >= - \
-                    180 and coords[0] <= 180, f'latitude should be between -180 and 180'
-                assert coords[1] >= - \
-                    90 and coords[1] <= 90, f'longitude should be between -90 and 90'
-        elif geo_members['type'] == "MultiPolygon":
-            for _coords in geo_members['coordinates'][0]:
+        if geo_members["type"] == "Polygon":
+            for coords in geo_members["coordinates"][0]:
+                assert (
+                    len(coords) == 2
+                ), f'Invalid GeoJSON: In Feature Object, "geometry - coordinates" member is not valid'
+                assert (
+                    coords[0] >= -180 and coords[0] <= 180
+                ), f"latitude should be between -180 and 180"
+                assert (
+                    coords[1] >= -90 and coords[1] <= 90
+                ), f"longitude should be between -90 and 90"
+        elif geo_members["type"] == "MultiPolygon":
+            for _coords in geo_members["coordinates"][0]:
                 for coords in _coords:
-                    assert len(
-                        coords) == 2, f'Invalid GeoJSON: In Feature Object, "geometry - coordinates" member is not valid'
-                    assert coords[0] >= - \
-                        180 and coords[0] <= 180, f'latitude should be between -180 and 180'
-                    assert coords[1] >= - \
-                        90 and coords[1] <= 90, f'longitude should be between -90 and 90'
+                    assert (
+                        len(coords) == 2
+                    ), f'Invalid GeoJSON: In Feature Object, "geometry - coordinates" member is not valid'
+                    assert (
+                        coords[0] >= -180 and coords[0] <= 180
+                    ), f"latitude should be between -180 and 180"
+                    assert (
+                        coords[1] >= -90 and coords[1] <= 90
+                    ), f"longitude should be between -90 and 90"
         return geometry
+
 
 class AOIGeoJSONModel(GeoJSONModel):
     type: str
     features: List[AOIGeoJSONFeatureModel]
 
-    @field_validator('features')
+    @field_validator("features")
     def check_geojson_features_is_valid(cls, features):
         if len(features) != 1:
             raise InvalidGeoJSONError(
-                f'Invalid GeoJSON: Features must be a list with 1 element, you provided {len(features)}.')
+                f"Invalid GeoJSON: Features must be a list with 1 element, you provided {len(features)}."
+            )
         return features
-    
+
+
 class AOICreateModel(BaseModel):
     name: str
     geojson: AOIGeoJSONModel
+
 
 @app.post("/aois")
 def create_new_aoi(aoi: AOICreateModel):
     try:
         storage.create(aoi.geojson.model_dump(), f"{aoi.name}.geojson")
     except Exception as e:
-        print('ERROR', repr(e))
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+        print("ERROR", repr(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+
 
 @app.get("/aois")
 def retrieve_aois():
@@ -144,15 +184,19 @@ def retrieve_aois():
         return [
             {
                 "name": aoi.split(".geojson")[0],
-                "features": storage.read(aoi).__geo_interface__ # if geojson, storage returns GeoDataframe
-            } for aoi in aois
+                "features": storage.read(
+                    aoi
+                ).__geo_interface__,  # if geojson, storage returns GeoDataframe
+            }
+            for aoi in aois
         ]
     except Exception as e:
-        print('ERROR', repr(e))
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+        print("ERROR", repr(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=repr(e))
 
-# explore and download images 
+
+# explore and download images
+
 
 class ExploreImages(BaseModel):
     aoi: str
@@ -161,28 +205,30 @@ class ExploreImages(BaseModel):
     sensor: str
     cloud_coverage: float
 
+
 @app.post("/images")
 def explore_satellite_images(body: ExploreImages):
     try:
         aoi = storage.read(f"{body.aoi}.geojson")
         images = explore_satellite_imagery(
-            aoi, 
-            date = (body.startDate, body.endDate),
+            aoi,
+            date=(body.startDate, body.endDate),
             collection=body.sensor,
-            cloud_cover=body.cloud_coverage
+            cloud_cover=body.cloud_coverage,
         )
         if len(images) == 0:
             raise ValueError("No images found")
         return images
     except Exception as e:
-        print('ERROR', repr(e))
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+        print("ERROR", repr(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+
 
 class DownloadImages(BaseModel):
     aoi: str
     dates: List[str]
     collection: str
+
 
 @app.post("/images/download")
 def download_satellite_images(body: DownloadImages):
@@ -191,27 +237,36 @@ def download_satellite_images(body: DownloadImages):
         for date in body.dates:
             download_satellite_imagery(
                 storage,
-                aoi, 
+                aoi,
                 date,
                 collection=body.collection,
-                name=f"{body.aoi}_{body.collection}_{date}.tif"
+                name=f"{body.aoi}_{body.collection}_{date}.tif",
             )
         return storage.list("*.tif")
     except Exception as e:
-        print('ERROR', repr(e))
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+        print("ERROR", repr(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+
 
 @app.get("/images")
-def retrieve_images():
+def retrieve_images(aoi: str):
     try:
-        return storage.list("*.tif")
+        return storage.list(f"{aoi}_*.tif")
     except Exception as e:
-        print('ERROR', repr(e))
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+        print("ERROR", repr(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=repr(e))
 
-# visualize images 
+
+@app.get("/layers")
+def retrieve_images(aoi: str):
+    try:
+        return storage.list(f"layer_{aoi}_*.tif")
+    except Exception as e:
+        print("ERROR", repr(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+
+
+# visualize images
 
 
 @app.get("/{image}/{z}/{x}/{y}.png")
@@ -238,12 +293,15 @@ def retrieve_image_tile(
         return StreamingResponse(image, media_type="image/png")
     except ImageOutOfBounds as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=error.message)
-    
-# builder 
+
+
+# builder
+
 
 class GraphBody(BaseModel):
     nodes: List[dict]
     edges: List[dict]
+
 
 @app.post("/graph")
 def save_graph(body: GraphBody):
@@ -251,11 +309,11 @@ def save_graph(body: GraphBody):
         # Storage de momento no guarda listas... pero es un json...
         storage.create_from_dict(body.nodes, "nodes.json")
         storage.create_from_dict(body.edges, "edges.json")
-        return 
+        return
     except Exception as e:
-        print('ERROR', repr(e))
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+        print("ERROR", repr(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+
 
 @app.get("/graph")
 def retrieve_graph():
@@ -266,14 +324,11 @@ def retrieve_graph():
         # esto puede afectar si alguna propiedad no espera un valor como 0...
         # el storage debería  exponer una manera de leer un json directamente, sin pasar por pandas !!!
         print(nodes)
-        return {
-            "nodes": nodes,
-            "edges": edges
-        }
+        return {"nodes": nodes, "edges": edges}
     except Exception as e:
-        print('ERROR', repr(e))
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+        print("ERROR", repr(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+
 
 @app.post("/graph/run")
 def save_graph(body: GraphBody):
@@ -284,20 +339,20 @@ def save_graph(body: GraphBody):
         # convert to dask graph
         graph = {}
         for node in body.nodes:
-            data = node['data']
-            fn = nodeId2Function(data['id'])
-            args = [field['value'] for field in data['fields']]
-            # find inputs in edges 
-            inputs = data['inputs']
-            _edges = [edge for edge in edges if edge['source'] == node['id']]
+            data = node["data"]
+            fn = nodeId2Function(data["id"])
+            args = [field["value"] for field in data["fields"]]
+            # find inputs in edges
+            inputs = data["inputs"]
+            _edges = [edge for edge in edges if edge["source"] == node["id"]]
             for input in inputs:
-                input_name = input['name']
-                edge = [edge for edge in _edges if edge['sourceHandle'] == input_name]
+                input_name = input["name"]
+                edge = [edge for edge in _edges if edge["sourceHandle"] == input_name]
                 assert len(edge) == 1, f"Edge {input_name} not found"
-                input = edge[0]['target']
+                input = edge[0]["target"]
                 args += [input]
-            graph[node['id']] = (fn, *args)
-        evaluate = [node['id'] for node in body.nodes if evaluable(node['data'])]
+            graph[node["id"]] = (fn, *args)
+        evaluate = [node["id"] for node in body.nodes if evaluable(node["data"])]
         # print("\ngraph", graph)
         # print("\nevaluate", evaluate)
         # run graph
@@ -305,11 +360,12 @@ def save_graph(body: GraphBody):
         # print('\nresults', results)
         return results
     except Exception as e:
-        print('ERROR', repr(e))
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=repr(e))
-    
+        print("ERROR", repr(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+
+
 # TODO: move functions to a separate file
+
 
 def nodeId2Function(id):
     if id == "Area of Interest":
@@ -317,34 +373,91 @@ def nodeId2Function(id):
     if id == "Date Selector":
         return parse_dates
     if id == "Forest Monitoring":
-        return forest_monitoring
+        return _forest_monitoring
     raise ValueError(f"Node {id} not found")
 
-def evaluable(data): # should return serializable data
-    if data['id'] == "Forest Monitoring":
+
+def evaluable(data):  # should return serializable data
+    if data["id"] == "Forest Monitoring":
         return True
     return False
 
+
 def read_aoi(name):
     if name:
-        return storage.read(f"{name}.geojson").__geo_interface__
+        return name, storage.read(f"{name}.geojson").__geo_interface__
     raise ValueError("AOI name not valid")
+
 
 def parse_dates(dates):
     print("dates", dates)
     return dates
 
-def forest_monitoring(aoi, dates):
-    print("aoi", aoi)
+
+from spai.analytics.forest_monitoring import forest_monitoring
+
+
+def _forest_monitoring(aoi, dates):
+    aoi_name, geojson = aoi
+    print("aoi", aoi_name)
+    print("geojson", geojson)
     print("dates", dates)
+    # retrieve images
+    existing_images = storage.list(f"{aoi_name}_*.tif")
+    _dates = [image.split("_")[-1].split(".")[0] for image in existing_images]
+    print("Found", len(_dates), f"existing image{'s' if len(_dates) > 1 else ''}")
+    collection = "sentinel-2-l2a"
+    dates = (dates[0].split("T")[0], dates[1].split("T")[0])
+    available_images = explore_satellite_imagery(
+        aoi=geojson, date=dates, collection=collection, cloud_cover=50
+    )
+    print(
+        "Available",
+        len(available_images),
+        f"image{'s' if len(available_images) > 1 else ''}",
+    )
+    if not available_images and not _dates:
+        raise ValueError("No images available")
+    if not available_images:
+        available_images = []
+    images = [
+        image
+        for image in available_images
+        if image["datetime"].split("T")[0] not in _dates
+    ]
+    print("Downloading", len(images), f"new image{'s' if len(images) > 1 else ''}")
+    new_images, names = [], []
+    for image in images:
+        # check if image is already downloaded
+        date = image["datetime"].split("T")[0]
+        if date in _dates or date in new_images:
+            print("Image already downloaded:", date)
+            continue
+        new_images.append(date)
+        print("Downloading new image:", date)
+        name = f"{aoi_name}_{collection}_{date}.tif"
+        path = download_satellite_imagery(
+            storage,
+            geojson,
+            date,
+            collection,
+            name,
+        )
+        names.append(name)
+        print("Image saved at", path)
+    names += existing_images
+    for name in names:
+        print("Computing forest monitoring for", name)
+        forest_monitoring(name, geojson, storage, prefix=f"layer_{aoi_name}_")
     return "forest monitoring"
-    
+
+
 # need this to run in background
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", type=str, default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument("--reload", action='store_true', help="Enable hot reloading")
+    parser.add_argument("--reload", action="store_true", help="Enable hot reloading")
     args = parser.parse_args()
     uvicorn.run(app, host=args.host, port=args.port)
     # uvicorn.run("main:app", host=args.host, port=args.port, reload=True)

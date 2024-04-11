@@ -346,5 +346,5 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--reload", action='store_true', help="Enable hot reloading")
     args = parser.parse_args()
-    # uvicorn.run(app, host=args.host, port=args.port)
-    uvicorn.run("main:app", host=args.host, port=args.port, reload=True)
+    uvicorn.run(app, host=args.host, port=args.port)
+    # uvicorn.run("main:app", host=args.host, port=args.port, reload=True)

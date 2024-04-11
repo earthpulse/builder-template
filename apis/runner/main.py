@@ -7,18 +7,13 @@ from pydantic import BaseModel, field_validator
 import json
 from typing import List, Dict
 import os
-from dotenv import load_dotenv
 from spai.config import SPAIVars
-from spai.data.satellite import explore_satellite_images, download_satellite_image
+from spai.data.satellite import explore_satellite_imagery, download_satellite_imagery
 from spai.image.xyz import get_image_data, get_tile_data, ready_image
 from starlette.responses import StreamingResponse
 from spai.image.xyz.errors import ImageOutOfBounds
 from typing import List
 from dask import get
-import time 
-
-load_dotenv()
-
 
 app = FastAPI(title="builder-runner", version="0.1.0", description="API to run code from the SPAI builder and provide outputs.")
 app.add_middleware(
@@ -167,13 +162,13 @@ class ExploreImages(BaseModel):
     cloud_coverage: float
 
 @app.post("/images")
-def explore_satellite_imagery(body: ExploreImages):
+def explore_satellite_images(body: ExploreImages):
     try:
         aoi = storage.read(f"{body.aoi}.geojson")
-        images = explore_satellite_images(
+        images = explore_satellite_imagery(
             aoi, 
-            time_interval = (body.startDate, body.endDate),
-            sensor=body.sensor,
+            date = (body.startDate, body.endDate),
+            collection=body.sensor,
             cloud_cover=body.cloud_coverage
         )
         if len(images) == 0:
@@ -187,10 +182,10 @@ def explore_satellite_imagery(body: ExploreImages):
 class DownloadImages(BaseModel):
     aoi: str
     dates: List[str]
-    sensor: str
+    collection: str
 
 @app.post("/images/download")
-def download_satellite_imagery(body: DownloadImages):
+def download_satellite_images(body: DownloadImages):
     try:
         aoi = storage.read(f"{body.aoi}.geojson")
         for date in body.dates:
@@ -198,8 +193,8 @@ def download_satellite_imagery(body: DownloadImages):
                 storage,
                 aoi, 
                 date,
-                sensor=body.sensor,
-                name=f"{body.aoi}_{body.sensor}_{date}.tif"
+                collection=body.collection,
+                name=f"{body.aoi}_{body.collection}_{date}.tif"
             )
         return storage.list("*.tif")
     except Exception as e:
@@ -351,5 +346,5 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--reload", action='store_true', help="Enable hot reloading")
     args = parser.parse_args()
-    uvicorn.run(app, host=args.host, port=args.port)
-    # uvicorn.run("main:app", host=args.host, port=args.port, reload=True)
+    # uvicorn.run(app, host=args.host, port=args.port)
+    uvicorn.run("main:app", host=args.host, port=args.port, reload=True)

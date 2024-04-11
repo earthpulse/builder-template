@@ -1,8 +1,6 @@
 fastapi
 uvicorn
 spai
-python-dotenv
-sentinelhub
 geopandas
 overpy
 geojson
@@ -14,3 +12,6 @@ matplotlib
 shapely 
 dask
 geopandas
+rioxarray
+pystac-client
+odc-stac

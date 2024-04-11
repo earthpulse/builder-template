@@ -194,11 +194,12 @@ def download_satellite_imagery(body: DownloadImages):
     try:
         aoi = storage.read(f"{body.aoi}.geojson")
         for date in body.dates:
-            download_satellite_image(
+            download_satellite_imagery(
                 storage,
                 aoi, 
                 date,
                 sensor=body.sensor,
+                name=f"{body.aoi}_{body.sensor}_{date}.tif"
             )
         return storage.list("*.tif")
     except Exception as e:

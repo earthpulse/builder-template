@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-spai
+spai>=2024.04.17
 geopandas
 overpy
 geojson

@@ -277,7 +277,7 @@ def retrieve_image_tile(
     y: int,
     bands: str = "1",
     stretch: str = "0,1",
-    palette: str = "viridis",
+    palette: str = "GnBu",
 ):
     image_path = storage.get_path(image)
     tile_size = (256, 256)
@@ -364,6 +364,41 @@ def save_graph(body: GraphBody):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=repr(e))
 
 
+class VizOptionsBody(BaseModel):
+    category: str
+    data: dict
+
+
+@app.post("/graph/vizOptions")
+def save_graph_viz_optins(body: VizOptionsBody):
+    try:
+        try:
+            current_data = storage.read("vizOptions.json").to_dict()
+        except Exception as e:
+            current_data = {body.category: {}}
+        if not body.category in current_data:
+            current_data[body.category] = {}
+        current_data[body.category].update(body.data)
+        storage.create(current_data, "vizOptions.json")
+        return
+    except Exception as e:
+        print("ERROR", repr(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+
+
+@app.get("/graph/vizOptions")
+def retrieve_graph_viz_optins():
+    try:
+        try:
+            viz_options = storage.read("vizOptions.json").to_dict()
+            return viz_options
+        except Exception as e:
+            return {}
+    except Exception as e:
+        print("ERROR", repr(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=repr(e))
+
+
 # TODO: move functions to a separate file
 
 
@@ -395,6 +430,8 @@ def parse_dates(dates):
 
 
 from spai.analytics.forest_monitoring import forest_monitoring
+
+import time
 
 
 def _forest_monitoring(aoi, dates):
@@ -448,7 +485,8 @@ def _forest_monitoring(aoi, dates):
     names += existing_images
     for name in names:
         print("Computing forest monitoring for", name)
-        forest_monitoring(name, geojson, storage, prefix=f"layer_{aoi_name}_")
+        date = name.split("_")[-1].split(".")[0]
+        forest_monitoring(name, date, geojson, storage, prefix=f"layer_{aoi_name}_")
     return "forest monitoring"
 
 

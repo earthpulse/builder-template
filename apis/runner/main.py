@@ -331,11 +331,11 @@ def retrieve_graph():
 
 
 @app.post("/graph/run")
-def save_graph(body: GraphBody):
+def run_graph(body: GraphBody):
     try:
         # save graph
-        nodes = storage.read("nodes.json").to_dict(orient="records")
-        edges = storage.read("edges.json").to_dict(orient="records")
+        storage.create_from_dict(body.nodes, "nodes.json")
+        storage.create_from_dict(body.edges, "edges.json")
         # convert to dask graph
         graph = {}
         for node in body.nodes:
@@ -344,7 +344,7 @@ def save_graph(body: GraphBody):
             args = [field["value"] for field in data["fields"]]
             # find inputs in edges
             inputs = data["inputs"]
-            _edges = [edge for edge in edges if edge["source"] == node["id"]]
+            _edges = [edge for edge in body.edges if edge["source"] == node["id"]]
             for input in inputs:
                 input_name = input["name"]
                 edge = [edge for edge in _edges if edge["sourceHandle"] == input_name]
